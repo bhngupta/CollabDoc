@@ -5,6 +5,7 @@ import (
 	"CollabDoc/pkg/persistence"
 	"fmt"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 )
@@ -16,15 +17,15 @@ var upgrader = websocket.Upgrader{
 }
 
 type Message struct {
-	Type  string `json:"type"`
-	DocID string `json:"doc_id,omitempty"`
-	Key   string `json:"key,omitempty"`
-	Value string `json:"value,omitempty"`
+	Type string             `json:"type"`
+	Op   document.Operation `json:"operation,omitempty"`
 }
 
 var (
-	ss      *document.StateSynchronizer
-	persist *persistence.Persistence
+	ss              *document.StateSynchronizer
+	persist         *persistence.Persistence
+	operations      = make(map[string][]document.Operation)
+	operationsMutex sync.Mutex
 )
 
 func init() {
@@ -59,17 +60,24 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 
 		switch msg.Type {
+		case "operation":
+			operationsMutex.Lock()
+			doc := ss.Documents[msg.Op.DocID]
+			opsSinceBase := operations[msg.Op.DocID][msg.Op.BaseVersion:]
+			transformedOp := HandleOperation(doc, msg.Op, opsSinceBase)
+			operations[msg.Op.DocID] = append(operations[msg.Op.DocID], transformedOp)
+			operationsMutex.Unlock()
+
+			// Broadcast the transformed operation
+			BroadcastOperation(transformedOp)
+
+			// Save state
+			persist.SaveState(ss)
 		case "create":
-			doc := ss.CreateDocument(msg.DocID)
+			doc := ss.CreateDocument(msg.Op.DocID)
 			err = ws.WriteJSON(doc)
-		case "update":
-			success := ss.UpdateDocument(msg.DocID, msg.Key, msg.Value)
-			if success {
-				persist.SaveState(ss)
-			}
-			err = ws.WriteJSON(map[string]bool{"success": success})
 		case "get":
-			doc, exists := ss.GetDocument(msg.DocID)
+			doc, exists := ss.GetDocument(msg.Op.DocID)
 			if exists {
 				err = ws.WriteJSON(doc)
 			} else {
@@ -84,6 +92,19 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
+}
+
+func HandleOperation(doc *document.Document, op document.Operation, opsSinceBase []document.Operation) document.Operation {
+	for _, prevOp := range opsSinceBase {
+		op = document.TransformOperation(op, prevOp)
+	}
+	document.ApplyOperation(doc, op)
+	return op
+}
+
+func BroadcastOperation(op document.Operation) {
+	// Send the operation to all connected clients
+	// Implement this function based on your WebSocket library
 }
 
 func StartWebSocketServer() {

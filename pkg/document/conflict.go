@@ -8,9 +8,9 @@ type ConflictResolver struct {
 	mutex sync.Mutex
 }
 
-func (cr *ConflictResolver) ResolveConflict(doc *Document, key, newValue string) {
+func (cr *ConflictResolver) ResolveConflict(doc *Document, op Operation) {
 	cr.mutex.Lock()
 	defer cr.mutex.Unlock()
-	// Simple conflict resolution strategy: last write wins
-	doc.Content[key] = newValue
+	// Apply the operation directly to the document content
+	ApplyOperation(doc, op)
 }

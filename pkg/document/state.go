@@ -1,13 +1,10 @@
 package document
 
-type Document struct {
-	ID      string            `json:"id"`
-	Content map[string]string `json:"content"`
-}
+import "time"
 
 type StateSynchronizer struct {
-	Documents        map[string]*Document
-	ConflictResolver *ConflictResolver
+	Documents        map[string]*Document `json:"documents"`
+	ConflictResolver *ConflictResolver    `json:"-"`
 }
 
 func NewStateSynchronizer() *StateSynchronizer {
@@ -23,16 +20,23 @@ func (ss *StateSynchronizer) GetDocument(id string) (*Document, bool) {
 }
 
 func (ss *StateSynchronizer) CreateDocument(id string) *Document {
-	doc := &Document{ID: id, Content: make(map[string]string)}
+	doc := &Document{
+		ID:        id,
+		Title:     "Untitled Document",
+		Content:   "",
+		Version:   1,
+		CreatedAt: time.Now().Format(time.RFC3339),
+		UpdatedAt: time.Now().Format(time.RFC3339),
+	}
 	ss.Documents[id] = doc
 	return doc
 }
 
-func (ss *StateSynchronizer) UpdateDocument(id, key, value string) bool {
+func (ss *StateSynchronizer) UpdateDocument(id string, op Operation) bool {
 	doc, exists := ss.Documents[id]
 	if !exists {
 		return false
 	}
-	ss.ConflictResolver.ResolveConflict(doc, key, value)
+	ss.ConflictResolver.ResolveConflict(doc, op)
 	return true
 }

@@ -25,7 +25,7 @@ func TestWebSocketServer(t *testing.T) {
 	defer ws.Close()
 
 	// Test create document
-	createMsg := server.Message{Type: "create", DocID: "doc1"}
+	createMsg := server.Message{Type: "create", Op: document.Operation{DocID: "doc1"}}
 	err = ws.WriteJSON(createMsg)
 	assert.NoError(t, err)
 
@@ -35,7 +35,7 @@ func TestWebSocketServer(t *testing.T) {
 	assert.Equal(t, "doc1", createResponse.ID)
 
 	// Test update document
-	updateMsg := server.Message{Type: "update", DocID: "doc1", Key: "title", Value: "Collaborative Document"}
+	updateMsg := server.Message{Type: "operation", Op: document.Operation{DocID: "doc1", OpType: "update", Pos: 0, Content: "Collaborative Document", BaseVersion: createResponse.Version}}
 	err = ws.WriteJSON(updateMsg)
 	assert.NoError(t, err)
 
@@ -45,7 +45,7 @@ func TestWebSocketServer(t *testing.T) {
 	assert.True(t, updateResponse["success"])
 
 	// Test get document
-	getMsg := server.Message{Type: "get", DocID: "doc1"}
+	getMsg := server.Message{Type: "get", Op: document.Operation{DocID: "doc1"}}
 	err = ws.WriteJSON(getMsg)
 	assert.NoError(t, err)
 
@@ -53,5 +53,5 @@ func TestWebSocketServer(t *testing.T) {
 	err = ws.ReadJSON(&getResponse)
 	assert.NoError(t, err)
 	assert.Equal(t, "doc1", getResponse.ID)
-	assert.Equal(t, "Collaborative Document", getResponse.Content["title"])
+	assert.Equal(t, "Collaborative Document", getResponse.Content)
 }
