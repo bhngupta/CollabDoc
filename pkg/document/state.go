@@ -1,18 +1,20 @@
-// pkg/document/state.go
-
 package document
 
 type Document struct {
-	ID      string            `json:"id"`      // This ID can be the same as the URL
-	Content map[string]string `json:"content"` // key-value to represent document content
+	ID      string            `json:"id"`
+	Content map[string]string `json:"content"`
 }
 
 type StateSynchronizer struct {
-	Documents map[string]*Document
+	Documents        map[string]*Document
+	ConflictResolver *ConflictResolver
 }
 
 func NewStateSynchronizer() *StateSynchronizer {
-	return &StateSynchronizer{Documents: make(map[string]*Document)}
+	return &StateSynchronizer{
+		Documents:        make(map[string]*Document),
+		ConflictResolver: &ConflictResolver{}, // Properly initialize ConflictResolver
+	}
 }
 
 func (ss *StateSynchronizer) GetDocument(id string) (*Document, bool) {
@@ -31,6 +33,6 @@ func (ss *StateSynchronizer) UpdateDocument(id, key, value string) bool {
 	if !exists {
 		return false
 	}
-	doc.Content[key] = value
+	ss.ConflictResolver.ResolveConflict(doc, key, value)
 	return true
 }

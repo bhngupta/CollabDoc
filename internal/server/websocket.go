@@ -1,5 +1,3 @@
-// internal/server/websocket.go
-
 package server
 
 import (
@@ -36,10 +34,15 @@ func init() {
 	if err != nil {
 		fmt.Println("Error loading state:", err)
 		ss = document.NewStateSynchronizer()
+	} else {
+		// Ensure ConflictResolver is initialized even when loading from persistence
+		if ss.ConflictResolver == nil {
+			ss.ConflictResolver = &document.ConflictResolver{}
+		}
 	}
 }
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
+func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("Upgrade error:", err)
@@ -84,7 +87,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 }
 
 func StartWebSocketServer() {
-	http.HandleFunc("/ws", handleConnections)
+	http.HandleFunc("/ws", HandleConnections)
 	fmt.Println("WebSocket server started on :8080")
 	err := http.ListenAndServe(":8080", nil)
 	if err != nil {

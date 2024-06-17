@@ -3,6 +3,8 @@ package tests
 import (
 	"CollabDoc/internal/server"
 	"CollabDoc/pkg/document"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -10,11 +12,14 @@ import (
 )
 
 func TestWebSocketServer(t *testing.T) {
-	// Start the WebSocket server
-	go server.StartWebSocketServer()
+	// Create a test server
+	testServer := httptest.NewServer(http.HandlerFunc(server.HandleConnections))
+	defer testServer.Close()
+
+	// Convert the test server URL to WebSocket URL
+	u := "ws" + testServer.URL[4:] + "/ws"
 
 	// Create a WebSocket client
-	u := "ws://localhost:8080/ws"
 	ws, _, err := websocket.DefaultDialer.Dial(u, nil)
 	assert.NoError(t, err)
 	defer ws.Close()
