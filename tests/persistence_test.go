@@ -19,7 +19,13 @@ func TestPersistence(t *testing.T) {
 
 	// Create a document and save state
 	ss.CreateDocument("doc1")
-	ss.UpdateDocument("doc1", "title", "Collaborative Document")
+	op := document.Operation{
+		DocID:   "doc1",
+		OpType:  "update",
+		Pos:     0,
+		Content: "Collaborative Document",
+	}
+	ss.UpdateDocument("doc1", op)
 	err := persist.SaveState(ss)
 	assert.NoError(t, err)
 
@@ -29,5 +35,5 @@ func TestPersistence(t *testing.T) {
 
 	doc, exists := loadedSS.GetDocument("doc1")
 	assert.True(t, exists)
-	assert.Equal(t, "Collaborative Document", doc.Content["title"])
+	assert.Equal(t, "Collaborative Document", doc.Content)
 }
