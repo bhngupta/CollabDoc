@@ -20,5 +20,19 @@
 # Go workspace file
 go.work
 
+# React Typescript 
+
+# dependencies
+/node_modules
+
+# testing
+/coverage
+
+# production
+/build
+
 # Misc
 .DS_Store
+
+.env
+npm-debug.log
