@@ -30,7 +30,7 @@ func TestConcurrentUpdates(t *testing.T) {
 	defer client2.Close()
 
 	// Create a document using Client 1
-	createMsg := server.Message{Type: "create", DocID: "doc1"}
+	createMsg := server.Message{Type: "create", Op: document.Operation{DocID: "doc1"}}
 	err = client1.WriteJSON(createMsg)
 	assert.NoError(t, err)
 
@@ -40,8 +40,8 @@ func TestConcurrentUpdates(t *testing.T) {
 	assert.Equal(t, "doc1", createResponse.ID)
 
 	// Prepare update messages from both clients
-	updateMsgClient1 := server.Message{Type: "update", DocID: "doc1", Key: "title", Value: "Title from Client 1"}
-	updateMsgClient2 := server.Message{Type: "update", DocID: "doc1", Key: "title", Value: "Title from Client 2"}
+	updateMsgClient1 := server.Message{Type: "operation", Op: document.Operation{DocID: "doc1", OpType: "update", Pos: 0, Content: "Title from Client 1", BaseVersion: createResponse.Version}}
+	updateMsgClient2 := server.Message{Type: "operation", Op: document.Operation{DocID: "doc1", OpType: "update", Pos: 0, Content: "Title from Client 2", BaseVersion: createResponse.Version}}
 
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -74,7 +74,7 @@ func TestConcurrentUpdates(t *testing.T) {
 	wg.Wait()
 
 	// Retrieve the document using Client 1
-	getMsg := server.Message{Type: "get", DocID: "doc1"}
+	getMsg := server.Message{Type: "get", Op: document.Operation{DocID: "doc1"}}
 	err = client1.WriteJSON(getMsg)
 	assert.NoError(t, err)
 
@@ -84,9 +84,9 @@ func TestConcurrentUpdates(t *testing.T) {
 	assert.Equal(t, "doc1", getResponse.ID)
 
 	// Verify the final title of the document
-	finalTitle := getResponse.Content["title"]
-	assert.Contains(t, []string{"Title from Client 1", "Title from Client 2"}, finalTitle)
+	finalContent := getResponse.Content
+	assert.Contains(t, []string{"Title from Client 1", "Title from Client 2"}, finalContent)
 
-	// Log the final title for visibility
-	t.Logf("Final title of the document: %s", finalTitle)
+	// Log the final content for visibility
+	t.Logf("Final content of the document: %s", finalContent)
 }
