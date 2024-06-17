@@ -1,7 +1,9 @@
+// pkg/document/state.go
+
 package document
 
 type Document struct {
-	ID      string            `json:"id"`      // This ID can be same as the URL ??
+	ID      string            `json:"id"`      // This ID can be the same as the URL
 	Content map[string]string `json:"content"` // key-value to represent document content
 }
 
