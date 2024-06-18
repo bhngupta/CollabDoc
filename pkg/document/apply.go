@@ -9,7 +9,7 @@ func ApplyOperation(doc *Document, op Operation) {
 	case "delete":
 		doc.Content = doc.Content[:op.Pos] + doc.Content[op.Pos+op.Length:]
 	case "update":
-		doc.Content = doc.Content[:op.Pos] + op.Content + doc.Content[op.Pos+op.Length:]
+		doc.Content = op.Content
 	}
 	doc.Version++
 	doc.UpdatedAt = time.Now().Format(time.RFC3339)
