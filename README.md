@@ -121,7 +121,8 @@ Start collaborating in real-time!
 ## Future Plans
 
 - [x] ~~Implement broadcasting to clinets on same document ID~~
-- [x] ~~Handle multiple clients concurrently using multi-threading or an event loop~~ 
+- [x] ~~Handle multiple clients concurrently using multi-threading or an event loop~~
+- [ ] create new arch diagram
 - [ ] Write integration tests 
 - [ ] Implement a more robust persistence layer - MongoDB 
 - [ ] Extend the editor to support rich text and code formatting
