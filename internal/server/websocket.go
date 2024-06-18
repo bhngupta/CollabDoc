@@ -51,6 +51,8 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer ws.Close()
 
+	var docID string
+
 	for {
 		var msg Message
 		err := ws.ReadJSON(&msg)
@@ -59,32 +61,65 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
+		if docID == "" && msg.Op.DocID != "" {
+			docID = msg.Op.DocID
+			fmt.Printf("Client connected from %s with Document ID: %s\n", ws.RemoteAddr(), docID)
+		}
+
 		switch msg.Type {
 		case "operation":
+			fmt.Printf("Received operation for Document ID %s: %+v\n", docID, msg.Op)
+
 			operationsMutex.Lock()
-			doc := ss.Documents[msg.Op.DocID]
+			doc, docExists := ss.Documents[msg.Op.DocID]
+			if !docExists || doc == nil {
+				// Create document if it does not exist
+				doc = ss.CreateDocument(msg.Op.DocID)
+				ss.Documents[msg.Op.DocID] = doc
+				fmt.Printf("Document with ID %s created.\n", msg.Op.DocID)
+			}
+
 			opsSinceBase := operations[msg.Op.DocID][msg.Op.BaseVersion:]
 			transformedOp := HandleOperation(doc, msg.Op, opsSinceBase)
 			operations[msg.Op.DocID] = append(operations[msg.Op.DocID], transformedOp)
 			operationsMutex.Unlock()
 
+			// Log the transformed operation
+			fmt.Printf("Transformed operation for Document ID %s: %+v\n", docID, transformedOp)
+
 			// Broadcast the transformed operation
 			BroadcastOperation(transformedOp)
 
 			// Save state
-			persist.SaveState(ss)
+			err = persist.SaveState(ss)
+			if err != nil {
+				fmt.Println("Error saving state:", err)
+			}
+
 		case "create":
 			doc := ss.CreateDocument(msg.Op.DocID)
+			fmt.Printf("Created document: %+v\n", doc)
 			err = ws.WriteJSON(doc)
+
 		case "get":
 			doc, exists := ss.GetDocument(msg.Op.DocID)
 			if exists {
-				err = ws.WriteJSON(doc)
+				err = ws.WriteJSON(map[string]interface{}{
+					"id":      docID,
+					"content": doc.Content, // Adjust according to your document structure
+				})
+				if err != nil {
+					fmt.Println("Error sending document content:", err)
+				}
 			} else {
 				err = ws.WriteJSON(map[string]bool{"exists": false})
+				if err != nil {
+					fmt.Println("Error sending document not found:", err)
+				}
 			}
+
 		default:
-			fmt.Println("Unknown message type")
+			fmt.Println("Unknown message type:", msg.Type)
 		}
 
 		if err != nil {
