@@ -33,3 +33,9 @@ frontend/node_modules/
 
 # Misc
 .DS_Store
+
+.env
+npm-debug.log
+
+.vscode
+

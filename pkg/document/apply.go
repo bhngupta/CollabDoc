@@ -26,7 +26,7 @@ func ApplyOperation(doc *Document, op Operation) error {
 			fmt.Printf("Invalid operation length: %d, document length: %d\n", op.Length, len(doc.Content))
 			return fmt.Errorf("invalid operation length: %d", op.Length)
 		}
-		doc.Content = op.Content
+		doc.Content = doc.Content[:op.Pos] + op.Content + doc.Content[op.Pos+op.Length:]
 	default:
 		fmt.Printf("Unknown operation type: %s\n", op.OpType)
 		return fmt.Errorf("unknown operation type: %s", op.OpType)
