@@ -80,13 +80,14 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 				pendingOperations[msg.Op.DocID] = []document.Operation{}
 			}
 
+			msg.Op.BaseVersion = doc.Version
 			fmt.Printf("Operations array before this: %+v\n", operations)
-			// Ensure the base version is within valid range
-			if msg.Op.BaseVersion < 1 || msg.Op.BaseVersion > len(operations[msg.Op.DocID])+1 {
-				fmt.Println("Invalid BaseVersion range:", msg.Op.BaseVersion, "length:", len(operations[msg.Op.DocID]))
-				operationsMutex.Unlock()
-				break
-			}
+			// // Ensure the base version is within valid range
+			// if msg.Op.BaseVersion < 1 || msg.Op.BaseVersion > doc.Version {
+			// 	fmt.Println("Invalid BaseVersion range:", msg.Op.BaseVersion, "current document version:", doc.Version)
+			// 	operationsMutex.Unlock()
+			// 	break
+			// }
 
 			fmt.Printf("BaseVersion: %d, Document Content: %s, Operations: %+v\n", msg.Op.BaseVersion, doc.Content, operations[msg.Op.DocID])
 			// Queue the operation
@@ -116,11 +117,15 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			err = ws.WriteJSON(doc)
 		case "get":
 			doc, exists := ss.GetDocument(msg.Op.DocID)
-			if exists {
-				err = ws.WriteJSON(doc)
-			} else {
-				err = ws.WriteJSON(map[string]bool{"exists": false})
+			if !exists {
+				doc = ss.CreateDocument(msg.Op.DocID)
+				operationsMutex.Lock()
+				operations[msg.Op.DocID] = []document.Operation{}
+				pendingOperations[msg.Op.DocID] = []document.Operation{}
+				operationsMutex.Unlock()
+				fmt.Printf("Created document as it didn't exist: %+v\n", doc)
 			}
+			err = ws.WriteJSON(doc)
 		default:
 			fmt.Println("Unknown message type")
 		}
@@ -139,6 +144,7 @@ func processPendingOperations(doc *document.Document, docID string) {
 	fmt.Printf("Processing operations for document ID: %s\n", docID)
 	if ops, ok := pendingOperations[docID]; ok {
 		for _, op := range ops {
+			// client: modified: Removed direct use of BaseVersion from the operation
 			opsSinceBase := operations[docID][op.BaseVersion-1:] // Include all operations since base version
 			fmt.Printf("Ops since base: %+v\n", opsSinceBase)
 			transformedOp := HandleOperation(doc, op, opsSinceBase)

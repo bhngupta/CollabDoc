@@ -1,12 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-
 import './DocumentEditor.css';
 
 const DocumentEditor: React.FC = () => {
   const { docID } = useParams<{ docID: string }>();
   const navigate = useNavigate();
   const [text, setText] = useState('');
+  const [prevText, setPrevText] = useState('');
   const ws = useRef<WebSocket | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -30,6 +30,7 @@ const DocumentEditor: React.FC = () => {
       console.log('Received message:', message);
       if (message.content !== undefined) {
         setText(message.content);
+        setPrevText(message.content); // Ensure previous text is set to the current text
       }
     };
 
@@ -50,24 +51,53 @@ const DocumentEditor: React.FC = () => {
 
   const handleInputChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
     const inputValue = event.target.value;
-    const op = {
-      docID,
-      OpType: 'update',
-      Pos: 0,
-      Length: text.length,
-      Content: inputValue,
-    };
+    const selectionStart = event.target.selectionStart;
+    const prevLength = prevText.length;
+    const currLength = inputValue.length;
+
+    let opType = '';
+    let pos = 0;
+    let length = 0;
+    let content = '';
+
+    if (currLength > prevLength) {
+      // Insertion
+      opType = 'insert';
+      pos = selectionStart - (currLength - prevLength);
+      length = 0;
+      content = inputValue.slice(pos, selectionStart);
+    } else if (currLength < prevLength) {
+      // Deletion
+      if (selectionStart === pos) {
+        // Backspace
+        opType = 'backspace';
+        pos = selectionStart;
+        length = 1;
+      } else {
+        opType = 'delete';
+        pos = selectionStart;
+        length = prevLength - currLength;
+      }
+    }
+
+    if (opType) {
+      const op = {
+        docID,
+        OpType: opType,
+        Pos: pos,
+        Length: length,
+        Content: content,
+      };
+
+      console.log('Generated operation:', op); // Log the operation
+
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ type: 'operation', operation: op }));
+      }
+    }
 
     setText(inputValue);
-
-    const operation = {
-      type: 'operation',
-      operation: op,
-    };
-
-    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      ws.current.send(JSON.stringify(operation));
-    }
+    setPrevText(inputValue);
   };
 
   return (
