@@ -39,10 +39,10 @@ func TestWebSocketServer(t *testing.T) {
 	err = ws.WriteJSON(updateMsg)
 	assert.NoError(t, err)
 
-	var updateResponse map[string]bool
+	var updateResponse map[string]interface{}
 	err = ws.ReadJSON(&updateResponse)
 	assert.NoError(t, err)
-	assert.True(t, updateResponse["success"])
+	assert.True(t, updateResponse["success"].(bool))
 
 	// Test get document
 	getMsg := server.Message{Type: "get", Op: document.Operation{DocID: "doc1"}}
