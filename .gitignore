@@ -38,4 +38,4 @@ frontend/node_modules/
 npm-debug.log
 
 .vscode
-
+state.json
