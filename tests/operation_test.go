@@ -13,6 +13,7 @@ func TestOperations(t *testing.T) {
 
 	// Create a document
 	doc := ss.CreateDocument("doc1")
+	t.Logf("Created document: %+v\n", doc)
 
 	// Define operations
 	operations := []document.Operation{
@@ -25,7 +26,8 @@ func TestOperations(t *testing.T) {
 
 	// Apply operations
 	for i, op := range operations {
-		ss.UpdateDocument("doc1", op)
+		success := ss.UpdateDocument("doc1", op)
+		assert.True(t, success)
 		finalDoc, exists := ss.GetDocument("doc1")
 		assert.True(t, exists)
 		t.Logf("After operation %d (%s): %s", i+1, op.OpType, finalDoc.Content)
