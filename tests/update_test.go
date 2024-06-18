@@ -13,7 +13,6 @@ func TestUpdateOperations(t *testing.T) {
 
 	// Create a document
 	doc := ss.CreateDocument("doc1")
-	t.Logf("Created document: %+v\n", doc)
 
 	// Define operations
 	operations := []document.Operation{
@@ -27,6 +26,8 @@ func TestUpdateOperations(t *testing.T) {
 		{DocID: "doc1", OpType: "update", Pos: 0, Length: 2, Content: "Hello", BaseVersion: doc.Version + 7},
 		{DocID: "doc1", OpType: "delete", Pos: 6, Length: 10, BaseVersion: doc.Version + 8},
 		{DocID: "doc1", OpType: "delete", Pos: 0, Length: 5, BaseVersion: doc.Version + 9},
+		{DocID: "doc1", OpType: "backspace", Pos: 8, BaseVersion: doc.Version + 10},
+		{DocID: "doc1", OpType: "backspace", Pos: 7, BaseVersion: doc.Version + 11}, // Backspace at position 8
 	}
 
 	// Apply operations
@@ -41,8 +42,8 @@ func TestUpdateOperations(t *testing.T) {
 	finalDoc, exists := ss.GetDocument("doc1")
 	assert.True(t, exists)
 
-	// Expected final content: "Hello Galaxy!"
-	expectedContent := " Galaxy!"
+	// Expected final content: "Beautiful!"
+	expectedContent := " Galax"
 
 	// Verify final content
 	assert.Equal(t, expectedContent, finalDoc.Content)

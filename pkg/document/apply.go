@@ -27,6 +27,12 @@ func ApplyOperation(doc *Document, op Operation) error {
 			return fmt.Errorf("invalid operation length: %d", op.Length)
 		}
 		doc.Content = doc.Content[:op.Pos] + op.Content + doc.Content[op.Pos+op.Length:]
+	case "backspace":
+		if op.Pos == 0 {
+			fmt.Println("Cannot perform backspace at position 0")
+			return fmt.Errorf("cannot perform backspace at position 0")
+		}
+		doc.Content = doc.Content[:op.Pos-1] + doc.Content[op.Pos:]
 	default:
 		fmt.Printf("Unknown operation type: %s\n", op.OpType)
 		return fmt.Errorf("unknown operation type: %s", op.OpType)
