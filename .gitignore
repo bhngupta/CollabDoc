@@ -20,6 +20,16 @@
 # Go workspace file
 go.work
 
+# React Typescript 
+
+# dependencies
+frontend/node_modules/
+
+# testing
+/coverage
+
+# production
+/build
+
 # Misc
 .DS_Store
-.vscode
