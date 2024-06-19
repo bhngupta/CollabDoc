@@ -26,6 +26,8 @@ var (
 	persist           *persistence.Persistence
 	pendingOperations = make(map[string][]document.Operation)
 	operationsMutex   sync.Mutex
+	clients           = make(map[string]map[*websocket.Conn]bool)
+	clientMutex       sync.Mutex
 )
 
 func init() {
@@ -40,10 +42,22 @@ func init() {
 		if ss.ConflictResolver == nil {
 			ss.ConflictResolver = &document.ConflictResolver{}
 		}
+		// Ensure documents map is initialized even when loading from persistence
+		if ss.Documents == nil {
+			ss.Documents = make(map[string]*document.Document)
+		}
 	}
+
+	clients = make(map[string]map[*websocket.Conn]bool)
 }
 
 func HandleConnections(w http.ResponseWriter, r *http.Request) {
+	docID := r.URL.Query().Get("docID")
+	if docID == "" {
+		http.Error(w, "docID is required", http.StatusBadRequest)
+		return
+	}
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		fmt.Println("Upgrade error:", err)
@@ -51,8 +65,22 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() {
 		ws.Close()
+		clientMutex.Lock()
+		delete(clients[docID], ws)
+		if len(clients[docID]) == 0 {
+			delete(clients, docID)
+		}
+		clientMutex.Unlock()
 		fmt.Println("Client disconnected:", ws.RemoteAddr())
 	}()
+
+	clientMutex.Lock()
+	if clients[docID] == nil {
+		clients[docID] = make(map[*websocket.Conn]bool)
+		fmt.Printf("Created new client map for document ID: %s\n", docID)
+	}
+	clients[docID][ws] = true
+	clientMutex.Unlock()
 
 	fmt.Println("Client connected:", ws.RemoteAddr())
 
@@ -87,6 +115,18 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			if err != nil {
 				fmt.Println("Error saving state:", err)
 			}
+
+			clientMutex.Lock()
+			for client := range clients[msg.Op.DocID] {
+				if client != ws {
+					if err := client.WriteJSON(doc); err != nil {
+						fmt.Println("Broadcast error:", err)
+						client.Close()
+						delete(clients[msg.Op.DocID], client)
+					}
+				}
+			}
+			clientMutex.Unlock()
 
 			err = ws.WriteJSON(map[string]interface{}{"success": true, "version": doc.Version})
 
