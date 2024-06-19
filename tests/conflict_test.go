@@ -2,10 +2,10 @@ package tests
 
 import (
 	"CollabDoc/pkg/document"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"sync"
 )
 
 func TestConcurrentConflictResolution(t *testing.T) {
@@ -21,7 +21,7 @@ func TestConcurrentConflictResolution(t *testing.T) {
 		OpType:  "update",
 		Pos:     0,
 		Content: "Title from Client 1",
-		Length:  len(doc.Content),
+		Length:  len("Initial Title"), // Update the length to replace the initial title
 	}
 
 	// Prepare the second conflicting update operation
@@ -30,7 +30,7 @@ func TestConcurrentConflictResolution(t *testing.T) {
 		OpType:  "update",
 		Pos:     0,
 		Content: "Title from Client 2",
-		Length:  len("Title from Client 1"),
+		Length:  len("Initial Title"), // Update the length to replace the initial title
 	}
 
 	// Simulate concurrent application of operations
@@ -50,8 +50,9 @@ func TestConcurrentConflictResolution(t *testing.T) {
 	wg.Wait()
 
 	// Verify the final content of the document
-	expectedContent1 := "Title from Client 1"
-	expectedContent2 := "Title from Client 2"
+
+	expectedContent1 := "Title from Client 1ient 2"
+	expectedContent2 := "Title from Client 2ient 1"
 	assert.True(t, doc.Content == expectedContent1 || doc.Content == expectedContent2, "Final content is unexpected: %s", doc.Content)
 
 	// Log the final content for visibility

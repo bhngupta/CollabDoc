@@ -35,7 +35,7 @@ func TestWebSocketServer(t *testing.T) {
 	assert.Equal(t, "doc1", createResponse.ID)
 
 	// Test update document
-	updateMsg := server.Message{Type: "operation", Op: document.Operation{DocID: "doc1", OpType: "update", Pos: 0, Content: "Collaborative Document", BaseVersion: createResponse.Version}}
+	updateMsg := server.Message{Type: "operation", Op: document.Operation{DocID: "doc1", OpType: "insert", Pos: 0, Content: "Collaborative Document", BaseVersion: createResponse.Version}}
 	err = ws.WriteJSON(updateMsg)
 	assert.NoError(t, err)
 
@@ -54,4 +54,8 @@ func TestWebSocketServer(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "doc1", getResponse.ID)
 	assert.Equal(t, "Collaborative Document", getResponse.Content)
+
+	// Close the WebSocket connection gracefully
+	err = ws.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+	assert.NoError(t, err)
 }
