@@ -29,11 +29,13 @@ const DocumentEditor: React.FC = () => {
     socket.onmessage = (event) => {
       const message = JSON.parse(event.data);
       console.log('Received message:', message);
-      if (message.content !== undefined) {
+      if (message.type === 'heartbeat_ack') {
+        // Handle heartbeat acknowledgement if needed
+      } else if (message.content !== undefined) {
         setText(message.content);
         setPrevText(message.content); // Ensure previous text is set to the current text
       }
-    };
+    };    
 
     socket.onerror = (error) => {
       console.error('WebSocket error:', error);
@@ -77,17 +79,11 @@ const DocumentEditor: React.FC = () => {
       length = 0;
       content = inputValue.slice(pos, selectionStart);
     } else if (currLength < prevLength) {
-      // Deletion
-      if (selectionStart === pos) {
-        // Backspace
-        opType = 'backspace';
-        pos = selectionStart;
-        length = 1;
-      } else {
+    
         opType = 'delete';
         pos = selectionStart;
         length = prevLength - currLength;
-      }
+      
     }
 
     if (opType) {
