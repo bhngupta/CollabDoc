@@ -3,8 +3,10 @@ package tests
 import (
 	"CollabDoc/internal/server"
 	"CollabDoc/pkg/document"
+	"CollabDoc/pkg/persistence"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -12,6 +14,16 @@ import (
 )
 
 func TestSequentialUpdates(t *testing.T) {
+	// Setup persistence file path
+	filePath := "test_state.json"
+	defer os.Remove(filePath)
+	persist := persistence.NewPersistence(filePath)
+
+	// Initialize StateSynchronizer and save initial state
+	ss := document.NewStateSynchronizer()
+	err := persist.SaveState(ss)
+	assert.NoError(t, err)
+
 	// Create a test server
 	testServer := httptest.NewServer(http.HandlerFunc(server.HandleConnections))
 	defer testServer.Close()

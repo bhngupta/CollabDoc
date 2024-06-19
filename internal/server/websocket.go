@@ -24,7 +24,6 @@ type Message struct {
 var (
 	ss                *document.StateSynchronizer
 	persist           *persistence.Persistence
-	operations        = make(map[string][]document.Operation)
 	pendingOperations = make(map[string][]document.Operation)
 	operationsMutex   sync.Mutex
 )
@@ -50,7 +49,12 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 		fmt.Println("Upgrade error:", err)
 		return
 	}
-	defer ws.Close()
+	defer func() {
+		ws.Close()
+		fmt.Println("Client disconnected:", ws.RemoteAddr())
+	}()
+
+	fmt.Println("Client connected:", ws.RemoteAddr())
 
 	for {
 		var msg Message
@@ -70,62 +74,50 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			// Initialize operations slice if it doesn't exist
-			if _, ok := operations[msg.Op.DocID]; !ok {
-				operations[msg.Op.DocID] = []document.Operation{}
-			}
-
-			// Initialize pendingOperations slice if it doesn't exist
 			if _, ok := pendingOperations[msg.Op.DocID]; !ok {
 				pendingOperations[msg.Op.DocID] = []document.Operation{}
 			}
 
-			msg.Op.BaseVersion = doc.Version
-			fmt.Printf("Operations array before this: %+v\n", operations)
-			// // Ensure the base version is within valid range
-			// if msg.Op.BaseVersion < 1 || msg.Op.BaseVersion > doc.Version {
-			// 	fmt.Println("Invalid BaseVersion range:", msg.Op.BaseVersion, "current document version:", doc.Version)
-			// 	operationsMutex.Unlock()
-			// 	break
-			// }
-
-			fmt.Printf("BaseVersion: %d, Document Content: %s, Operations: %+v\n", msg.Op.BaseVersion, doc.Content, operations[msg.Op.DocID])
-			// Queue the operation
 			pendingOperations[msg.Op.DocID] = append(pendingOperations[msg.Op.DocID], msg.Op)
 			operationsMutex.Unlock()
 
-			// Process the operations in the queue
-			processPendingOperations(doc, msg.Op.DocID)
+			document.ProcessPendingOperations(doc, msg.Op.DocID, pendingOperations)
 
-			// Save state
 			err = persist.SaveState(ss)
 			if err != nil {
 				fmt.Println("Error saving state:", err)
 			}
 
-			// Respond with success and the updated version
 			err = ws.WriteJSON(map[string]interface{}{"success": true, "version": doc.Version})
+
 		case "create":
 			doc := ss.CreateDocument(msg.Op.DocID)
-			// Initialize the operations slice for the new document
 			operationsMutex.Lock()
-			operations[msg.Op.DocID] = []document.Operation{}
 			pendingOperations[msg.Op.DocID] = []document.Operation{}
 			operationsMutex.Unlock()
 
 			fmt.Printf("Created document: %+v\n", doc)
 			err = ws.WriteJSON(doc)
+
 		case "get":
 			doc, exists := ss.GetDocument(msg.Op.DocID)
 			if !exists {
 				doc = ss.CreateDocument(msg.Op.DocID)
 				operationsMutex.Lock()
-				operations[msg.Op.DocID] = []document.Operation{}
 				pendingOperations[msg.Op.DocID] = []document.Operation{}
 				operationsMutex.Unlock()
 				fmt.Printf("Created document as it didn't exist: %+v\n", doc)
 			}
+
+			fmt.Printf("Client connected. ClientID: %p, DocID: %s\n", ws, msg.Op.DocID)
 			err = ws.WriteJSON(doc)
+
+		case "heartbeat":
+			err = ws.WriteJSON(map[string]interface{}{"type": "heartbeat_ack"})
+			if err != nil {
+				fmt.Println("Error: Sending Heartbeat")
+			}
+
 		default:
 			fmt.Println("Unknown message type")
 		}
@@ -135,45 +127,6 @@ func HandleConnections(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-}
-
-func processPendingOperations(doc *document.Document, docID string) {
-	operationsMutex.Lock()
-	defer operationsMutex.Unlock()
-
-	fmt.Printf("Processing operations for document ID: %s\n", docID)
-	if ops, ok := pendingOperations[docID]; ok {
-		for _, op := range ops {
-			// client: modified: Removed direct use of BaseVersion from the operation
-			opsSinceBase := operations[docID][op.BaseVersion-1:] // Include all operations since base version
-			fmt.Printf("Ops since base: %+v\n", opsSinceBase)
-			transformedOp := HandleOperation(doc, op, opsSinceBase)
-			// Append the transformed operation to the history
-			operations[docID] = append(operations[docID], transformedOp)
-			// Print document state after each operation
-			fmt.Printf("Document state after applying operation: %+v\n", doc)
-		}
-		// Clear the pending operations queue
-		pendingOperations[docID] = []document.Operation{}
-	}
-	// Print final document state after all operations
-	fmt.Printf("Final document state: %+v\n", doc)
-}
-
-func HandleOperation(doc *document.Document, op document.Operation, opsSinceBase []document.Operation) document.Operation {
-	fmt.Printf("Handling operation: %+v\n", op)
-	for _, prevOp := range opsSinceBase {
-		op = document.TransformOperation(op, prevOp)
-	}
-	err := document.ApplyOperation(doc, op)
-	if err != nil {
-		fmt.Println("ApplyOperation error:", err)
-		return op
-	}
-	doc.Version++ // Increment the document version after applying the operation
-	fmt.Printf("Document version after operation: %d\n", doc.Version)
-	fmt.Printf("Document state after applying operation: %+v\n", doc)
-	return op
 }
 
 func StartWebSocketServer() {

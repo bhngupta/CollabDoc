@@ -36,4 +36,28 @@ func TestPersistence(t *testing.T) {
 	doc, exists := loadedSS.GetDocument("doc1")
 	assert.True(t, exists)
 	assert.Equal(t, "Collaborative Document", doc.Content)
+
+	// Create another document, update it, and save state
+	ss.CreateDocument("doc2")
+	op2 := document.Operation{
+		DocID:   "doc2",
+		OpType:  "insert",
+		Pos:     0,
+		Content: "New Document",
+	}
+	ss.UpdateDocument("doc2", op2)
+	err = persist.SaveState(ss)
+	assert.NoError(t, err)
+
+	// Load state again and verify both documents
+	loadedSS, err = persist.LoadState()
+	assert.NoError(t, err)
+
+	doc1, exists := loadedSS.GetDocument("doc1")
+	assert.True(t, exists)
+	assert.Equal(t, "Collaborative Document", doc1.Content)
+
+	doc2, exists := loadedSS.GetDocument("doc2")
+	assert.True(t, exists)
+	assert.Equal(t, "New Document", doc2.Content)
 }

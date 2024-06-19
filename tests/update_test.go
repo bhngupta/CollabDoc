@@ -2,17 +2,28 @@ package tests
 
 import (
 	"CollabDoc/pkg/document"
+	"CollabDoc/pkg/persistence"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUpdateOperations(t *testing.T) {
-	// Initialize StateSynchronizer
+	// Setup persistence file path
+	filePath := "test_state.json"
+	defer os.Remove(filePath)
+	persist := persistence.NewPersistence(filePath)
+
+	// Initialize StateSynchronizer and save initial state
 	ss := document.NewStateSynchronizer()
+	err := persist.SaveState(ss)
+	assert.NoError(t, err)
 
 	// Create a document
 	doc := ss.CreateDocument("doc1")
+	err = persist.SaveState(ss)
+	assert.NoError(t, err)
 
 	// Define operations
 	operations := []document.Operation{
@@ -38,11 +49,19 @@ func TestUpdateOperations(t *testing.T) {
 		t.Logf("After operation %d (%s): %s", i+1, op.OpType, finalDoc.Content)
 	}
 
-	// Retrieve the document
-	finalDoc, exists := ss.GetDocument("doc1")
+	// Save the final state
+	err = persist.SaveState(ss)
+	assert.NoError(t, err)
+
+	// Load the state to verify persistence
+	loadedSS, err := persist.LoadState()
+	assert.NoError(t, err)
+
+	// Retrieve the document from loaded state
+	finalDoc, exists := loadedSS.GetDocument("doc1")
 	assert.True(t, exists)
 
-	// Expected final content: "Beautiful!"
+	// Expected final content: " Galax"
 	expectedContent := " Galax"
 
 	// Verify final content

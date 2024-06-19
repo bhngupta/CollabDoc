@@ -17,11 +17,12 @@ const DocumentEditor: React.FC = () => {
       return;
     }
 
-    const socket = new WebSocket(`ws://localhost:8080/ws`);
+    const socket = new WebSocket(`ws://localhost:8080/ws?docID=${docID}`);
     ws.current = socket;
 
     socket.onopen = () => {
       console.log('WebSocket connected');
+      // Only Sending GET Type of operation
       socket.send(JSON.stringify({ type: 'get', operation: { docID } }));
     };
 
@@ -41,9 +42,18 @@ const DocumentEditor: React.FC = () => {
     socket.onclose = (event) => {
       console.log('WebSocket connection closed:', event.code, event.reason);
     };
+    
+    // Heartbeat interval setup
+    const heartbeatInterval = setInterval(() => {
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+        ws.current.send(JSON.stringify({ type: 'heartbeat' }));
+      }
+    }, 500); // Send heartbeat every second (1000ms)
 
     return () => {
-      if (ws.current) {
+      clearInterval(heartbeatInterval);
+
+      if (ws.current && ws.current.readyState === WebSocket.OPEN) {
         ws.current.close();
       }
     };

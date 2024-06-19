@@ -3,8 +3,10 @@ package tests
 import (
 	"CollabDoc/internal/server"
 	"CollabDoc/pkg/document"
+	"CollabDoc/pkg/persistence"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/gorilla/websocket"
@@ -12,6 +14,16 @@ import (
 )
 
 func TestStreamOfOperations(t *testing.T) {
+	// Setup persistence file path
+	filePath := "test_state.json"
+	defer os.Remove(filePath)
+	persist := persistence.NewPersistence(filePath)
+
+	// Initialize StateSynchronizer and save initial state
+	ss := document.NewStateSynchronizer()
+	err := persist.SaveState(ss)
+	assert.NoError(t, err)
+
 	// Create a test server
 	testServer := httptest.NewServer(http.HandlerFunc(server.HandleConnections))
 	defer testServer.Close()
@@ -34,7 +46,7 @@ func TestStreamOfOperations(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "doc1", createResponse.ID)
 
-	// Define operations without BaseVersion
+	// Define operations with BaseVersion set to 0 initially
 	operations := []document.Operation{
 		{DocID: "doc1", OpType: "insert", Pos: 0, Content: "Hello World"},
 		{DocID: "doc1", OpType: "update", Pos: 6, Length: 5, Content: "Universe"},
@@ -50,7 +62,7 @@ func TestStreamOfOperations(t *testing.T) {
 		{DocID: "doc1", OpType: "backspace", Pos: 7},
 	}
 
-	var currentVersion int = 1 // Initial version is 1 after document creation
+	var currentVersion int = createResponse.Version // Initial version is set after document creation
 	// Apply operations
 	for i, op := range operations {
 		// Send the operation to the server
